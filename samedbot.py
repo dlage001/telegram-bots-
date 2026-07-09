@@ -2,15 +2,18 @@ import asyncio
 import logging
 import sqlite3
 import time
+import os
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
+from aiohttp import web  # Добавили встроенный в aiogram веб-сервер
 
-# Вставь сюда токен своего бота от @BotFather
+# Токен твоего бота от @BotFather
 TOKEN = "7599682006:AAEdtVENoWngqtgZ0XuL-abXB3utXN1LrGw"
 ADMIN_ID = 6737680689
-# Инициализация бота и диспетчера
+
+# Чистая инициализация БЕЗ ПРОКСИ (на Render интернет полностью открыт)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -78,25 +81,21 @@ async def cmd_status(message: Message):
 async def cmd_time(message: Message):
     user_id = message.from_user.id
     
-    # Если это админ, для него кулдауна нет, сразу пишем, что еще не выебали
     if user_id == ADMIN_ID:
         await message.answer("⏰ Вы еще не выебали сомеда!")
         return
 
     user = get_user(user_id)
     current_time = int(time.time())
-    cooldown = 2 * 60 * 60  # 2 часа в секундах
+    cooldown = 2 * 60 * 60
     passed_time = current_time - user["last_time"]
 
     if passed_time < cooldown and user["last_time"] != 0:
         remaining = cooldown - passed_time
         hours = remaining // 3600
         minutes = (remaining % 3600) // 60
-        
-        # Если осталось меньше минуты, напишем 1 мин для красоты
         if hours == 0 and minutes == 0:
             minutes = 1
-            
         time_str = f"{hours}ч {minutes}мин" if hours > 0 else f"{minutes}мин"
         await message.answer(f"⚠️ Слишком рано! Следующая заправка возможна через {time_str}")
     else:
@@ -107,11 +106,9 @@ async def handle_action(message: Message):
     user_id = message.from_user.id
     user = get_user(user_id)
     current_time = int(time.time())
-    cooldown = 2 * 60 * 60  # 2 часа в секундах
-    
+    cooldown = 2 * 60 * 60
     passed_time = current_time - user["last_time"]
     
-    # Если пишет админ, полностью игнорируем проверку времени
     if user_id == ADMIN_ID:
         new_liters = user["liters"] + 2
         update_user(user_id, new_liters, current_time)
@@ -124,7 +121,6 @@ async def handle_action(message: Message):
         minutes = (remaining % 3600) // 60
         if hours == 0 and minutes == 0:
             minutes = 1
-            
         time_str = f"{hours}ч {minutes}мин" if hours > 0 else f"{minutes}мин"
         await message.answer(f"⚠️ Слишком рано! Следующая заправка возможна через {time_str}")
     else:
@@ -132,10 +128,27 @@ async def handle_action(message: Message):
         update_user(user_id, new_liters, current_time)
         await message.answer(f"✅ Вы залили в самед 2л. Всего в самеде: {new_liters}л")
 
+# --- ФЕЙКОВЫЙ ВЕБ-СЕРВЕР ДЛЯ ОБХОДА МУТА RENDER ---
+async def handle_web(request):
+    return web.Response(text="Bot is running!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_web)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # Render автоматически передает нужный порт в переменную PORT
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"Фейковый веб-сервер запущен на порту {port}")
+
 # --- ЗАПУСК БОТА ---
 async def main():
     init_db()
-    print("Бот успешно запущен!")
+    # Запускаем фейковый веб-сервер фоном, чтобы Render не ругался
+    await start_web_server()
+    print("Бот успешно запущен на Render!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
