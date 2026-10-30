@@ -7,20 +7,16 @@ from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
-from aiohttp import web  # Добавили встроенный в aiogram веб-сервер
+from aiohttp import web
 
-# Токен твоего бота от @BotFather
-TOKEN = "7599682006:AAEdtVENoWngqtgZ0XuL-abXB3utXN1LrGw"
-ADMIN_ID = 6737680689
+TOKEN = "токен сюда"
+ADMIN_ID = айди свой сюда
 
-# Чистая инициализация БЕЗ ПРОКСИ (на Render интернет полностью открыт)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# --- РАБОТА С БАЗОЙ ДАННЫХ ---
 def init_db():
     conn = sqlite3.connect("samed_bot.db")
     cursor = conn.cursor()
@@ -55,8 +51,6 @@ def update_user(user_id, liters, last_time):
     conn.commit()
     conn.close()
 
-# --- ХЕНДЛЕРЫ ---
-
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     text = (
@@ -73,16 +67,16 @@ async def cmd_start(message: Message):
 async def cmd_status(message: Message):
     user = get_user(message.from_user.id)
     if user["liters"] == 0:
-        await message.answer("🛢️ сомед еще пуст! Напишите 'сомед' чтобы выебать сомеда")
+        await message.answer("сомед еще пуст! Напишите 'сомед' чтобы выебать сомеда")
     else:
-        await message.answer(f"✅ Всего в самеде: {user['liters']}л")
+        await message.answer(f"Всего в самеде: {user['liters']}л")
 
 @dp.message(Command("time"))
 async def cmd_time(message: Message):
     user_id = message.from_user.id
     
     if user_id == ADMIN_ID:
-        await message.answer("⏰ Вы еще не выебали сомеда!")
+        await message.answer("Вы еще не выебали сомеда!")
         return
 
     user = get_user(user_id)
@@ -97,9 +91,9 @@ async def cmd_time(message: Message):
         if hours == 0 and minutes == 0:
             minutes = 1
         time_str = f"{hours}ч {minutes}мин" if hours > 0 else f"{minutes}мин"
-        await message.answer(f"⚠️ Слишком рано! Следующая заправка возможна через {time_str}")
+        await message.answer(f"Слишком рано! Следующая заправка возможна через {time_str}")
     else:
-        await message.answer("⏰ Вы еще не выебали сомеда!")
+        await message.answer("Вы еще не выебали сомеда!")
 
 @dp.message(F.text.lower().in_({"сомед", "бензин"}))
 async def handle_action(message: Message):
@@ -112,7 +106,7 @@ async def handle_action(message: Message):
     if user_id == ADMIN_ID:
         new_liters = user["liters"] + 2
         update_user(user_id, new_liters, current_time)
-        await message.answer(f"✅ Вы залили в самед 2л. Всего в самеде: {new_liters}л")
+        await message.answer(f"Вы залили в самед 2л. Всего в самеде: {new_liters}л")
         return
 
     if passed_time < cooldown and user["last_time"] != 0:
@@ -122,33 +116,27 @@ async def handle_action(message: Message):
         if hours == 0 and minutes == 0:
             minutes = 1
         time_str = f"{hours}ч {minutes}мин" if hours > 0 else f"{minutes}мин"
-        await message.answer(f"⚠️ Слишком рано! Следующая заправка возможна через {time_str}")
+        await message.answer(f"Слишком рано! Следующая заправка возможна через {time_str}")
     else:
         new_liters = user["liters"] + 2
         update_user(user_id, new_liters, current_time)
-        await message.answer(f"✅ Вы залили в самед 2л. Всего в самеде: {new_liters}л")
+        await message.answer(f"Вы залили в самед 2л. Всего в самеде: {new_liters}л")
 
-# --- ФЕЙКОВЫЙ ВЕБ-СЕРВЕР ДЛЯ ОБХОДА МУТА RENDER ---
 async def handle_web(request):
-    return web.Response(text="Bot is running!")
+    return web.Response(text="OK")
 
 async def start_web_server():
     app = web.Application()
     app.router.add_get("/", handle_web)
     runner = web.AppRunner(app)
     await runner.setup()
-    # Render автоматически передает нужный порт в переменную PORT
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"Фейковый веб-сервер запущен на порту {port}")
 
-# --- ЗАПУСК БОТА ---
 async def main():
     init_db()
-    # Запускаем фейковый веб-сервер фоном, чтобы Render не ругался
     await start_web_server()
-    print("Бот успешно запущен на Render!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
